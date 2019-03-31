@@ -15,10 +15,10 @@ from twitter import OAuth
 import json 
 from pandas.io.json import json_normalize
 
-ck = 'NdBW8SRT6a5soVASHwkyEmXyf' #consumer key
-cs = 'yuk9AmssZz7Va9Y817yaaRdwIHUKSb34knffi8cDNipC1jnMEm' #consumer key secret
-at = '985411522313809922-4PswVkpjvlFWuMTDRXg4jzVnjwC1Ns2' 
-ats = 'aNuOS4ub1DEryuG6Xx4EUZEI14LtgkdhOJeAPY4ULS0nx'
+ck = '' #consumer key
+cs = '' #consumer key secret
+at = '' 
+ats = ''
 
 oauth = OAuth(at,ats,ck,cs)
 
