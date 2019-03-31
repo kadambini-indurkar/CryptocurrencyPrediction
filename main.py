@@ -15,9 +15,8 @@ import time
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
-from scipy import stats
+import html5lib
 from sklearn.metrics import mean_squared_error
-from sklearn.preprocessing import scale
 from math import sqrt
 from random import randint
 from keras.models import Sequential
@@ -31,6 +30,9 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
+import plotly.offline as py
+import plotly.graph_objs as go
+
 #from keras.models import Sequential
 #from keras.layers import Dense
 #from keras.layers import LSTM
@@ -40,7 +42,9 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 data = pd.read_html("https://coinmarketcap.com/currencies/bitcoin/historical-data/?start=20130428&end="+time.strftime("%Y%m%d"))[0]
+#data = pd.read_html("https://in.investing.com/crypto/bitcoin/btc-usd-historical-data"+time.strftime("%Y%m%d"))[0]
 # conversion the date string to the correct date format
+
 data = data.assign(Date=pd.to_datetime(data['Date']))
 #print(data['Date'])
 d = data['Date']
@@ -59,29 +63,29 @@ print(data.head(n=n))
 
 data['date'] = pd.to_datetime(data['Date'])
 group = data.groupby('date')
-Daily_Price = group['Low'].mean()
+Daily_Price = group['Close**'].mean()
 
 Daily_Price.head()
 
 Daily_Price.tail()
 
 from datetime import date
-d0 = date(2017, 1, 1)
-d1 = date(2018, 10, 15)
+d0 = date(2017, 4, 1)
+d1 = date(2019, 2, 11)
 delta = d1 - d0
 days_look = delta.days + 1
 print(days_look)
 
-d0 = date(2018, 8, 21)
-d1 = date(2018, 10, 20)
+d0 = date(2018, 12, 17)
+d1 = date(2019, 2, 15)
 delta = d1 - d0
 days_from_train = delta.days + 1
 print(days_from_train)
 
-d0 = date(2018, 10, 15)
-d1 = date(2018, 10, 20)
+d0 = date(2019, 2, 11)
+d1 = date(2019, 2, 12)
 delta = d1 - d0
-days_from_end = delta.days + 10
+days_from_end = delta.days + 20
 print(days_from_end)
 
 df_train= Daily_Price[len(Daily_Price)-days_look-days_from_end:len(Daily_Price)-days_from_train]
@@ -95,27 +99,6 @@ working_data = pd.concat(working_data)
 working_data = working_data.reset_index()
 working_data['date'] = pd.to_datetime(working_data['date'])
 working_data = working_data.set_index('date')
-s = sm.tsa.seasonal_decompose(working_data.Low.values, freq=60)
-import plotly.offline as py
-import plotly.graph_objs as go
-
-trace1 = go.Scatter(x = np.arange(0, len(s.trend), 1),y = s.trend,mode = 'lines',name = 'Trend',
-    line = dict(color = ('rgb(244, 146, 65)'), width = 4))
-trace2 = go.Scatter(x = np.arange(0, len(s.seasonal), 1),y = s.seasonal,mode = 'lines',name = 'Seasonal',
-    line = dict(color = ('rgb(112,128,144)'), width = 2))
-
-trace3 = go.Scatter(x = np.arange(0, len(s.resid), 1),y = s.resid,mode = 'lines',name = 'Residual',
-    line = dict(color = ('rgb(0, 51, 0)'), width = 2))
-
-trace4 = go.Scatter(x = np.arange(0, len(s.observed), 1),y = s.observed,mode = 'lines',name = 'Observed',
-    line = dict(color = ('rgb(139, 69, 19)'), width = 2))
-
-data = [trace1, trace2, trace3, trace4]
-layout = dict(title = 'Seasonal decomposition', xaxis = dict(title = 'Time'), yaxis = dict(title = 'Price, USD'))
-fig = dict(data=data, layout=layout)
-py.plot(fig, filename='seasonal_decomposition')
-
-
 
 df_train = working_data[:-60]
 df_test = working_data[-60:]
@@ -157,9 +140,7 @@ model.add(Dense(1))
 
 # compile and fit the model
 model.compile(loss='mean_squared_error', optimizer='adam')
-history = model.fit(X_train, Y_train, epochs=100, batch_size=16, shuffle=False,
-                    validation_data=(X_test, Y_test),
-                    callbacks = [EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=20, verbose=1)])
+history = model.fit(X_train, Y_train, epochs=100, batch_size=30, shuffle=False, validation_data=(X_test, Y_test), callbacks = [EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=25, verbose=1)])
 
 trace1 = go.Scatter(
     x = np.arange(0, len(history.history['loss']), 1),
@@ -173,11 +154,11 @@ trace2 = go.Scatter(
     y = history.history['val_loss'],
     mode = 'lines',
     name = 'Test loss',
-    line = dict(color=('rgb(244, 146, 65)'), width=2)
+    line = dict(color=('rgb(213, 67, 77)'), width=2)
 )
 
 data = [trace1, trace2]
-layout = dict(title = 'Train and Test Loss during training',
+layout = dict(title = 'Calculated Train and Test Loss during training',
               xaxis = dict(title = 'Epoch number'), yaxis = dict(title = 'Loss'))
 fig = dict(data=data, layout=layout)
 py.plot(fig, filename='training_process')
@@ -199,7 +180,7 @@ trace1 = go.Scatter(
     y = prediction2_inverse,
     mode = 'lines',
     name = 'Predicted labels',
-    line = dict(color=('rgb(0, 128, 128)'), width=2)
+    line = dict(color=('rgb(0, 128, 128)'), width=2, dash='dash')
 )
 trace2 = go.Scatter(
     x = np.arange(0, len(Y_test2_inverse), 1),
@@ -223,7 +204,7 @@ Test_Dates = Daily_Price[len(Daily_Price)-days_from_train:].index
 trace1 = go.Scatter(x=Test_Dates, y=Y_test2_inverse, name= 'Actual Price',
                    line = dict(color = ('rgb(153, 0, 76)'),width = 2))
 trace2 = go.Scatter(x=Test_Dates, y=prediction2_inverse, name= 'Predicted Price',
-                   line = dict(color = ('rgb(51,0, 0)'),width = 2))
+                   line = dict(color = ('rgb(51,0, 0)'),width = 2, dash='dash'))
 data = [trace1, trace2]
 layout = dict(title = 'Comparison of true prices (on the test dataset) with prices our model predicted, by dates',
              xaxis = dict(title = 'Date'), yaxis = dict(title = 'Price, USD'))
@@ -270,7 +251,7 @@ def train_model(X_train, Y_train, X_test, Y_test):
 
     # compile and fit the model
     model.compile(loss='mean_squared_error', optimizer='adam')
-    model.fit(X_train, Y_train, epochs = 100, batch_size = 16, shuffle = False,
+    model.fit(X_train, Y_train, epochs = 100, batch_size = 25, shuffle = False,
                     validation_data=(X_test, Y_test), verbose=0,
                     callbacks = [EarlyStopping(monitor='val_loss',min_delta=5e-5,patience=20,verbose=0)])
     return model
@@ -323,7 +304,7 @@ print('Test GRU model RMSE_new: %.3f' % RMSE_new)
 trace1 = go.Scatter(x=Test_Dates, y=Y_test2_inverse, name= 'Actual Price',
                    line = dict(color = ('rgb(112,128,144)'),width = 2))
 trace2 = go.Scatter(x=Test_Dates, y=predictions_new, name= 'Predicted Price',
-                   line = dict(color = ('rgb(51, 0, 0)'),width = 2))
+                   line = dict(color = ('rgb(51, 0, 0)'),width = 2, dash='dash'))
 data = [trace1, trace2]
 layout = dict(title = 'Comparison of true prices (on the test dataset) with prices our model predicted, by dates',
              xaxis = dict(title = 'Date'), yaxis = dict(title = 'Price, USD'))
