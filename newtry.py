@@ -67,7 +67,7 @@ model.add(Bidirectional(LSTM(lookback, return_sequences=False)))
 model.add(Dense(output_dim=1))
 model.add(Activation('tanh'))
 
-model.compile(loss='mse', optimizer='adam')
+model.compile(loss='rmse', optimizer='adam')
 print(model.summary())
 
 start = time.time()
@@ -159,7 +159,7 @@ print("F1:", F1)
 #MSE
 from sklearn.metrics import mean_squared_error
 print()
-print("Testing MSE:", mean_squared_error(y_predict.flatten(), y_test.flatten()))
+print("Testing MSE:", np.sqrt(mean_squared_error(y_predict.flatten(), y_test.flatten())))
 
 
 

@@ -19,15 +19,14 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 import plotly.offline as py
 import plotly.graph_objs as go
-py.init_notebook_mode(connected=True)
+#py.init_notebook_mode(connected=True)
 
 
 
 
 
-py.init_notebook_mode(connected=True)
-from IPython import get_ipython
-get_ipython().run_line_magic('matplotlib', 'inline')
+#py.init_notebook_mode(connected=True)
+
 
 
 data = pd.read_csv('../input/bitstampUSD_1-min_data_2012-01-01_to_2017-10-20.csv')

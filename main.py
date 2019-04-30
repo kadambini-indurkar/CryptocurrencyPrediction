@@ -14,8 +14,6 @@ warnings.filterwarnings("ignore")
 import time
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
-import html5lib
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 from random import randint
@@ -29,6 +27,7 @@ from matplotlib import pyplot
 from datetime import datetime
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
+from keras import backend as K
 
 import plotly.offline as py
 import plotly.graph_objs as go
@@ -132,15 +131,28 @@ X_test, Y_test = create_lookback(test_set, look_back)
 X_train = np.reshape(X_train, (len(X_train), 1, X_train.shape[1]))
 X_test = np.reshape(X_test, (len(X_test), 1, X_test.shape[1]))
 
+sequence_length = 50
+lookback = sequence_length - 1
+from keras.layers import Bidirectional
+from keras.layers.core import Dense, Activation, Dropout
+print(X_train.shape[1])
+print(X_train.shape[2])
 # initialize sequential model, add 2 stacked LSTM layers and densely connected output neuron
 model = Sequential()
 model.add(LSTM(256, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+model.add(Dropout(0.2))
+model.add(Bidirectional(LSTM(256, return_sequences=True)))
+model.add(Dropout(0.2))
+
 model.add(LSTM(256))
 model.add(Dense(1))
+model.summary()
 
+def root_mean_squared_error(y_true, y_pred):
+        return K.sqrt(K.mean(K.square(y_pred - y_true)))
 # compile and fit the model
-model.compile(loss='mean_squared_error', optimizer='adam')
-history = model.fit(X_train, Y_train, epochs=100, batch_size=30, shuffle=False, validation_data=(X_test, Y_test), callbacks = [EarlyStopping(monitor='val_loss', min_delta=5e-5, patience=25, verbose=1)])
+model.compile(loss=root_mean_squared_error, optimizer='adam')
+history = model.fit(X_train, Y_train, epochs=100, batch_size=25, shuffle=False, validation_data=(X_test, Y_test), callbacks = [EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=30, verbose=1)])
 
 trace1 = go.Scatter(
     x = np.arange(0, len(history.history['loss']), 1),
@@ -168,12 +180,22 @@ py.plot(fig, filename='training_process')
 X_test = np.append(X_test, scaler.transform(working_data.iloc[[-1][0]]))
 X_test = np.reshape(X_test, (len(X_test), 1, -1))
 
+#print(X_test)
+
 # get predictions and then make some transformations to be able to calculate RMSE properly in USD
 prediction = model.predict(X_test)
 prediction_inverse = scaler.inverse_transform(prediction.reshape(-1, 1))
 Y_test_inverse = scaler.inverse_transform(Y_test.reshape(-1, 1))
 prediction2_inverse = np.array(prediction_inverse[:,0][1:])
 Y_test2_inverse = np.array(Y_test_inverse[:,0])
+t = np.array([5270])
+t = np.reshape(scaler.transform(t), (len(t), 1, -1))
+today_price = model.predict(t)
+print("---------------------------------------------------------")
+print("TODAY'S CLOSING PRICE CAN BE: ")
+x = scaler.inverse_transform(today_price.reshape(-1, 1))
+print(x)
+print("---------------------------------------------------------")
 
 trace1 = go.Scatter(
     x = np.arange(0, len(prediction2_inverse), 1),
@@ -191,25 +213,25 @@ trace2 = go.Scatter(
 )
 
 data = [trace1, trace2]
-layout = dict(title = 'Comparison of true prices (on the test dataset) with prices our model predicted',
+layout = dict(title = 'Comparison of true prices (on the test dataset): model prediction',
              xaxis = dict(title = 'Day number'), yaxis = dict(title = 'Price, USD'))
 fig = dict(data=data, layout=layout)
-py.plot(fig, filename='results_demonstrating0')
+py.plot(fig, filename='result1')
 
-RMSE = sqrt(mean_squared_error(Y_test2_inverse, prediction2_inverse))
+RMSE = sqrt(sqrt(mean_squared_error(Y_test2_inverse, prediction2_inverse)))
 print('Test RMSE: %.3f' % RMSE)
 
-Test_Dates = Daily_Price[len(Daily_Price)-days_from_train:].index
+Test_Dates = Daily_Price[len(Daily_Price)+4-days_from_train:].index
 
 trace1 = go.Scatter(x=Test_Dates, y=Y_test2_inverse, name= 'Actual Price',
                    line = dict(color = ('rgb(153, 0, 76)'),width = 2))
 trace2 = go.Scatter(x=Test_Dates, y=prediction2_inverse, name= 'Predicted Price',
                    line = dict(color = ('rgb(51,0, 0)'),width = 2, dash='dash'))
 data = [trace1, trace2]
-layout = dict(title = 'Comparison of true prices (on the test dataset) with prices our model predicted, by dates',
+layout = dict(title = 'Comparison of true prices predicted prices by dates',
              xaxis = dict(title = 'Date'), yaxis = dict(title = 'Price, USD'))
 fig = dict(data=data, layout=layout)
-py.plot(fig, filename='results_demonstrating1')
+py.plot(fig, filename='result2')
 
 # This function prepares random train/test split, 
 # scales data with MinMaxScaler, create time series labels (Y)
@@ -246,14 +268,23 @@ def get_split(working_data, n_train, n_test, look_back = 1):
 def train_model(X_train, Y_train, X_test, Y_test):
     # initialize sequential model, add bidirectional LSTM layer and densely connected output neuron
     model = Sequential()
-    model.add(GRU(256, input_shape=(X_train.shape[1], X_train.shape[2])))
+    model.add(Bidirectional(GRU(256, input_shape=(X_train.shape[1], X_train.shape[2]), return_sequences=True)))
+    model.add(Dropout(0.2))
+   # model.add(LSTM(256), return_sequences=True)
+    model.add(LSTM(256))
+    
+    #model.add(LSTM(256, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
+
+    #model.add(LSTM(256, input_shape=(X_train.shape[1], X_train.shape[2])))
     model.add(Dense(1))
+   
 
     # compile and fit the model
-    model.compile(loss='mean_squared_error', optimizer='adam')
+    model.compile(loss=root_mean_squared_error, optimizer='adam')
     model.fit(X_train, Y_train, epochs = 100, batch_size = 25, shuffle = False,
                     validation_data=(X_test, Y_test), verbose=0,
-                    callbacks = [EarlyStopping(monitor='val_loss',min_delta=5e-5,patience=20,verbose=0)])
+                    callbacks = [EarlyStopping(monitor='val_loss',min_delta=0.0001,patience=30,verbose=0)])
+    #model.summary()
     return model
 
 # This function uses trained model and test dataset to calculate RMSE
@@ -279,8 +310,8 @@ def workflow(working_data, get_split, train_model, get_rmse,n_train = 250,n_test
     return RMSE, predictions
 
 
-RMSE, predictions = workflow(working_data, get_split, train_model, get_rmse, n_train = 600,n_test = 60)
-print('Test GRU model RMSE: %.3f' % RMSE)
+RMSE, predictions = workflow(working_data, get_split, train_model, get_rmse, n_train = 600, n_test = 60)
+print('Test Transfer learning model RMSE: %.3f' % RMSE)
 
 def cross_validate(working_data,get_split,train_model,get_rmse,workflow,n_train = 250,n_test = 50,look_back = 1):
     rmse_list = []
@@ -298,26 +329,26 @@ print('RMSE list:', rmse_list)
 
 predictions_new = predictions - mean_rmse
 
-RMSE_new = sqrt(mean_squared_error(Y_test2_inverse, predictions_new))
-print('Test GRU model RMSE_new: %.3f' % RMSE_new)
+RMSE_new = sqrt(sqrt(mean_squared_error(Y_test2_inverse, predictions_new)))
+print('Test Transfer learning model RMSE_new: %.3f' % RMSE_new)
 
 trace1 = go.Scatter(x=Test_Dates, y=Y_test2_inverse, name= 'Actual Price',
                    line = dict(color = ('rgb(112,128,144)'),width = 2))
 trace2 = go.Scatter(x=Test_Dates, y=predictions_new, name= 'Predicted Price',
                    line = dict(color = ('rgb(51, 0, 0)'),width = 2, dash='dash'))
 data = [trace1, trace2]
-layout = dict(title = 'Comparison of true prices (on the test dataset) with prices our model predicted, by dates',
+layout = dict(title = 'Comparison of true prices prediction on test dataset by dates',
              xaxis = dict(title = 'Date'), yaxis = dict(title = 'Price, USD'))
 fig = dict(data=data, layout=layout)
-py.plot(fig, filename='results_demonstrating2')
+py.plot(fig, filename='result_file3')
  
 
 def symmetric_mean_absolute_percentage_error(y_true, y_pred, epsilon = 1e-8):
-    return np.mean(np.abs(y_pred - y_true) / ((np.abs(y_true) + np.abs(y_pred))/2 + epsilon)) * 100
+    return np.sqrt(np.mean(np.abs(y_pred - y_true) / ((np.abs(y_true) + np.abs(y_pred))/2 + epsilon)) * 100)
 
 SMAPE = symmetric_mean_absolute_percentage_error(Y_test2_inverse, predictions_new)
 
-print('Test SMAPE (percentage): %.3f' % SMAPE)
+print('Test SMAPE Percent: %.3f' % SMAPE)
 
 
    
